@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<firmwareconfig>
+    <section name="firmwareconfig" address="0xd000">
+	    <int bytes="2" offset="0x0">parameter1value</int>
+	    <int bytes="2" offset="0x2">parameter2value</int>
+    </section>
+</firmwareconfig>
