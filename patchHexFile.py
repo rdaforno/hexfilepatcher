@@ -19,8 +19,14 @@ import sys
 import os.path
 import xml.etree.ElementTree as ET
 
+
 xmlFile = 'fwConfig.xml'    # default filename
 
+
+def usage():
+  print("\r\nusage:  %s [firmware] [config]\r\n\r\n"
+        "  firmware \t filename of the firmware (Intel hex format)\r\n"
+        "  config \t (optional) filename of the XML config; if not provided, 'fwConfig.xml' will be used\r\n" % sys.argv[0])
 
 # Intel HEX file parser
 class hexFileParser:
@@ -88,6 +94,8 @@ class hexFileParser:
         self.lines[i]['data'] = self.insertData(self.lines[i]['data'], (addr - self.lines[i]['addr']), size, data)
       self.updateCRC(i)
       return 1
+    else:
+      return 0
 
   def insertData(self, line, ofs, size, data):  # inserts 'data' of length 'size' into 'line' at offset 'ofs'
     if size == 1:
@@ -123,16 +131,21 @@ def parseXML(xmlFile, hexFile):
         size = int(var.get("bytes"))
         ofs = address + int(var.get("offset", 0), 0)
         try:
-          val = int(var.text)
-          print("replacing %u bytes at address 0x%04X with value %d" % (size, ofs, val))
-          hexFile.replaceData(ofs, size, val)
+          if "0x" in var.text:
+            val = int(var.text, 16)
+          else:
+            val = int(var.text)
+          if hexFile.replaceData(ofs, size, val):
+            print("%u bytes at address 0x%04X overwritten with value %d" % (size, ofs, val))
+          else:
+            print("failed to write to address 0x%04X" % (ofs))
         except:
           print("invalid int value %s" % var.text)
 
 
 if __name__== "__main__":
   if len(sys.argv) < 2:
-    print("usage:  %s [firmware.hex] [config.xml]" % sys.argv[0])
+    usage()
     sys.exit(1)
   hexFileName = sys.argv[1]      # first argument is the hex filename
   if not os.path.isfile(hexFileName) or not hexFileName.lower().endswith('hex'):
