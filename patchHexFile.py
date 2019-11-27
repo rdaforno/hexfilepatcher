@@ -101,10 +101,9 @@ class hexFileParser:
     if size == 1:
       return line[:ofs*2] + ("%02X" % (data % 256)) + line[(ofs+size)*2:]
     elif size == 2:
-      return line[:ofs*2] + ("%04X" % (data % 65536)) + line[(ofs+size)*2:]
+      return line[:ofs*2] + ("%02X%02X" % (data % 256, (data >> 8) % 256)) + line[(ofs+size)*2:]             # little endian!
     elif size == 4:
-      return line[:ofs*2] + ("%08X" % (data % (2^32))) + line[(ofs+size)*2:]
-    return line
+      return line[:ofs*2] + ("%02X%02X%02X%02X" % (data % 256, (data >> 8) % 256, (data >> 16) % 256, (data >> 24) % 256)) + line[(ofs+size)*2:]    # little endian!
 
   def updateCRC(self, idx):
     if idx < len(self.lines):
