@@ -65,11 +65,34 @@ class hexFileParser:
     if fp:
       for line in self.lines:
         fp.write(":%02X%04X%02X%s%02X\n" % (line['len'], line['addr'], line['type'], line['data'], line['crc']))
+      fp.close()
       print("hex file saved as %s" % fileName)
+
+  def saveAsCVariable(self, fileName):
+    fp = open(fileName, "w")
+    if fp:
+      fp.write("const char hex_image[] = {\n  \"")
+      fp.write("\"\n  \"".join(self.serializeData()))
+      fp.write("\"\n};\n")
+      fp.close()
+      print("hex file saved as %s" % fileName)
+
+  def serializeData(self, start_addr=0, line_width=64):
+    serialized_data = []
+    for line in self.lines:
+      if line['addr'] > start_addr:
+        # fill gap with zeros
+        num_padding_bytes = (line['addr'] - start_addr)
+        serialized_data.append('00'*(num_padding_bytes))
+        print("added %d padding bytes at address %x" % (num_padding_bytes, line['addr']))
+      serialized_data.append(line['data'])
+      start_addr = line['addr'] + line['len']
+    serialized_str = "".join(serialized_data)
+    return [serialized_str[i:i+line_width] for i in range(0, len(serialized_str), line_width)]
 
   def addrToLineNo(self, addr):
     for i in range(len(self.lines)):
-      if self.lines[i]['type'] is not 0:    # only look at data records
+      if self.lines[i]['type'] != 0:    # only look at data records
         continue
       if self.lines[i]['addr'] <= addr and (self.lines[i]['addr'] + self.lines[i]['len']) > addr:
         return i
