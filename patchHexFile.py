@@ -92,7 +92,10 @@ class hexFileParser:
       serialized_data.append(line['data'])
       start_addr = line['addr'] + line['len']
     serialized_str = "".join(serialized_data)
-    return [serialized_str[i:i+line_width] for i in range(0, len(serialized_str), line_width)]
+    if line_width == 0:
+      return serialized_str
+    else:
+      return [serialized_str[i:i+line_width] for i in range(0, len(serialized_str), line_width)]
 
   def addrToLineNo(self, addr):
     for i in range(len(self.lines)):
