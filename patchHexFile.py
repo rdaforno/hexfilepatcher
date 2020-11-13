@@ -18,6 +18,7 @@
 import sys
 import os.path
 import xml.etree.ElementTree as ET
+import binascii
 
 
 xmlFile = 'fwConfig.xml'    # default filename
@@ -50,7 +51,7 @@ class hexFileParser:
           print("invalid data length! line '%s' skipped.." % line)
           continue
         crc = int(line[-2:], 16)
-        if self.calcCRC(line[:-2]) != crc:
+        if self.calcLineCRC(line[:-2]) != crc:
           print("invalid hex file, CRC doesn't match!")
           break
         self.lines.append({ 'len':l, 'addr':addr, 'type':t, 'data':data, 'crc':crc })
@@ -76,6 +77,9 @@ class hexFileParser:
       fp.write("\"\n};\n")
       fp.close()
       print("hex file saved as %s" % fileName)
+
+  def calcDataCRC32(self):
+    return "0x%x" % binascii.crc32(bytes.fromhex("".join(self.serializeData())))
 
   def serializeData(self, start_addr=0, line_width=64):
     serialized_data = []
@@ -112,10 +116,10 @@ class hexFileParser:
           return 0
         self.lines[i]['data'] = self.insertData(self.lines[i]['data'], ofs, self.lines[i]['len'] - ofs, data)
         self.lines[i+1]['data'] = self.insertData(self.lines[i+1]['data'], 0, size - (self.lines[i]['len'] - ofs), data)
-        self.updateCRC(i+1)
+        self.updateLineCRC(i+1)
       else:
         self.lines[i]['data'] = self.insertData(self.lines[i]['data'], (addr - self.lines[i]['addr']), size, data)
-      self.updateCRC(i)
+      self.updateLineCRC(i)
       return 1
     else:
       return 0
@@ -128,15 +132,15 @@ class hexFileParser:
     elif size == 4:
       return line[:ofs*2] + ("%02X%02X%02X%02X" % (data % 256, (data >> 8) % 256, (data >> 16) % 256, (data >> 24) % 256)) + line[(ofs+size)*2:]    # little endian!
 
-  def updateCRC(self, idx):
+  def updateLineCRC(self, idx):
     if idx < len(self.lines):
-      self.lines[idx]['crc'] = self.calcCRC("%02X%04X%02X%s" % (self.lines[idx]['len'], self.lines[idx]['addr'], self.lines[idx]['type'], self.lines[idx]['data']))
+      self.lines[idx]['crc'] = self.calcLineCRC("%02X%04X%02X%s" % (self.lines[idx]['len'], self.lines[idx]['addr'], self.lines[idx]['type'], self.lines[idx]['data']))
 
-  def calcCRC(self, data):
+  def calcLineCRC(self, line):
     crc = 0
     l = 0
-    while l < len(data) - 1:
-      crc = crc + int(data[l:l+2], 16)
+    while l < len(line) - 1:
+      crc = crc + int(line[l:l+2], 16)
       l = l + 2
     crc = (~crc + 1) % 256
     return crc
