@@ -105,17 +105,19 @@ class HexFileParser:
       return [serialized_str[i:i+line_width] for i in range(0, len(serialized_str), line_width)]
 
   def addr_to_lineno(self, addr):
+    addr_ofs = 0
     for i in range(len(self.lines)):
-      if self.lines[i]['type'] != 0:    # only look at data records
-        continue
-      if self.lines[i]['addr'] <= addr and (self.lines[i]['addr'] + self.lines[i]['len']) > addr:
-        return i
+      if self.lines[i]['type'] == 4:
+        addr_ofs = int(line['data'][0:4], 16) * 65536
+      elif self.lines[i]['type'] == 0:
+        if (addr_ofs + self.lines[i]['addr']) <= addr and (addr_ofs + self.lines[i]['addr'] + self.lines[i]['len']) > addr:
+          return i
     return -1
 
   def replace_data(self, addr, size, data):
     if size != 1 and size != 2 and size != 4:
       print("size %d is not supported" % size)
-      return 0
+      return False
     i = self.addr_to_lineno(addr)
     if i >= 0:
       ofs = (addr - self.lines[i]['addr'])
@@ -123,16 +125,15 @@ class HexFileParser:
         # make sure there is no jump in address to the next line
         if (i+1) == len(self.lines) or ((self.lines[i+1]['addr'] - self.lines[i]['addr']) > self.lines[i]['len']):
           print("out of bound error")
-          return 0
+          return False
         self.lines[i]['data'] = self.insert_data(self.lines[i]['data'], ofs, self.lines[i]['len'] - ofs, data)
         self.lines[i+1]['data'] = self.insert_data(self.lines[i+1]['data'], 0, size - (self.lines[i]['len'] - ofs), data)
         self.update_line_crc(i+1)
       else:
         self.lines[i]['data'] = self.insert_data(self.lines[i]['data'], (addr - self.lines[i]['addr']), size, data)
       self.update_line_crc(i)
-      return 1
-    else:
-      return 0
+      return True
+    return False
 
   def insert_data(self, line, ofs, size, data):  # inserts 'data' of length 'size' into 'line' at offset 'ofs'
     if size == 1:
