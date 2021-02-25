@@ -84,8 +84,11 @@ class HexFileParser:
           print("added %d padding bytes at address 0x%x" % (curr_addr - start_addr, curr_addr))
         serialized_data.append(line['data'])
         start_addr = curr_addr + line['len']
-      elif line['type'] == 4:
-        curr_ofs = int(line['data'][0:4], 16) * 65536
+      elif line['type'] == 4 or line['type'] == 2:
+        if line['type'] == 4:
+          curr_ofs = int(line['data'][0:4], 16) * 65536
+        else:
+          curr_ofs = int(line['data'][0:4], 16) << 4
         if start_addr == 0:
           # if this is the first line and start_addr is not given, then use this offset as the start address
           start_addr = curr_ofs
@@ -95,6 +98,11 @@ class HexFileParser:
         if curr_ofs < start_addr:
           print("invalid address offset")
           return None
+      elif line['type'] == 1:
+        pass  # marks the EOF
+      elif line['type'] == 3:
+        # defines the start address
+        pass
       else:
         print("skipping line of type %u" % line['type'])
     serialized_str = "".join(serialized_data)
@@ -104,33 +112,36 @@ class HexFileParser:
     else:
       return [serialized_str[i:i+line_width] for i in range(0, len(serialized_str), line_width)]
 
+  # returns a tuple of line index and line address
   def addr_to_lineno(self, addr):
     addr_ofs = 0
     for i in range(len(self.lines)):
-      if self.lines[i]['type'] == 4:
-        addr_ofs = int(line['data'][0:4], 16) * 65536
+      if self.lines[i]['type'] == 4:    # extended linear address record
+        addr_ofs = int(self.lines[i]['data'][0:4], 16) * 65536
+      elif self.lines[i]['type'] == 2:  # extended segment address record (bits 4–19)
+        addr_ofs = int(self.lines[i]['data'][0:4], 16) << 4
       elif self.lines[i]['type'] == 0:
         if (addr_ofs + self.lines[i]['addr']) <= addr and (addr_ofs + self.lines[i]['addr'] + self.lines[i]['len']) > addr:
-          return i
-    return -1
+          return (i, addr_ofs + self.lines[i]['addr'])
+    return (-1, -1)
 
   def replace_data(self, addr, size, data):
     if size != 1 and size != 2 and size != 4:
       print("size %d is not supported" % size)
       return False
-    i = self.addr_to_lineno(addr)
+    (i, line_addr) = self.addr_to_lineno(addr)
     if i >= 0:
-      ofs = (addr - self.lines[i]['addr'])
-      if (addr + size) > (self.lines[i]['addr'] + self.lines[i]['len']):   # data stretches over 2 lines
+      ofs = (addr - line_addr)
+      if (addr + size) > (line_addr + self.lines[i]['len']):   # data stretches over 2 lines
         # make sure there is no jump in address to the next line
-        if (i+1) == len(self.lines) or ((self.lines[i+1]['addr'] - self.lines[i]['addr']) > self.lines[i]['len']):
-          print("out of bound error")
+        if (i+1) == len(self.lines) or self.lines[i]['type'] != 6 or ((self.lines[i+1]['addr'] - self.lines[i]['addr']) > self.lines[i]['len']):
+          print("out of bound error")   # trying to overwrite an address that is not present in the hex file
           return False
         self.lines[i]['data'] = self.insert_data(self.lines[i]['data'], ofs, self.lines[i]['len'] - ofs, data)
         self.lines[i+1]['data'] = self.insert_data(self.lines[i+1]['data'], 0, size - (self.lines[i]['len'] - ofs), data)
         self.update_line_crc(i+1)
       else:
-        self.lines[i]['data'] = self.insert_data(self.lines[i]['data'], (addr - self.lines[i]['addr']), size, data)
+        self.lines[i]['data'] = self.insert_data(self.lines[i]['data'], (addr - line_addr), size, data)
       self.update_line_crc(i)
       return True
     return False

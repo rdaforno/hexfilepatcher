@@ -41,17 +41,17 @@ def parseXML(xmlFile, hexFile):
       if var.tag == "int":
         size = int(var.get("bytes"))
         ofs = address + int(var.get("offset", 0), 0)
-        try:
-          if "0x" in var.text:
-            val = int(var.text, 16)
-          else:
-            val = int(var.text)
-          if hexFile.replace_data(ofs, size, val):
-            print("%u bytes at address 0x%04X overwritten with value %d" % (size, ofs, val))
-          else:
-            print("failed to write to address 0x%04X" % (ofs))
-        except:
-          print("invalid int value %s" % var.text)
+        #try:
+        if "0x" in var.text:
+          val = int(var.text, 16)
+        else:
+          val = int(var.text)
+        if hexFile.replace_data(ofs, size, val):
+          print("%u bytes at address 0x%04X overwritten with value %d" % (size, ofs, val))
+        else:
+          print("failed to write to address 0x%04X" % (ofs))
+        #except:
+        #  print("invalid int value %s" % var.text)
 
 
 if __name__== "__main__":
@@ -69,6 +69,7 @@ if __name__== "__main__":
     sys.exit(1)
   # load the hex file
   hf = hexFileParser.HexFileParser(hex_filename)
+  hf.serialize_data()
   # parse and apply the XML config
   parseXML(xmlFile, hf)
   hf.save("parsed_" + hex_filename)
